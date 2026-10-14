@@ -373,6 +373,39 @@ degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
       <figcaption>13 張通過過濾、套用 CCTV 真實感後處理後的結果。主題明顯對上了：倉儲貨架走道、伺服器機櫃、
         AGV 機器人、門禁閘門護欄、電梯大廳、休息室販賣機、氣瓶/管線區⋯右下角可見 <code>CAM-xx</code> 時間戳記浮水印。</figcaption>
     </figure>
+    <h3>6.4　全流程程式碼驗證（步驟 03/04/05/08/10–16，mock + 真實訓練）</h3>
+    <p>
+      前面幾節只驗證了 02→06→07→09 這條支線。專案本身附了 <code>tools/run_smoke.sh</code>，
+      用假資料（<code>tools/make_fake_data.py</code> 生成的合成 COCO + 部署畫面）+ 全部換成 mock
+      生成器/偵測器，把 16 個步驟從頭到尾跑一遍——這次把它跑了兩種模式，驗證剩下完全沒碰過的程式碼路徑：
+    </p>
+    <table>
+      <tr><th>模式</th><th>涵蓋步驟</th><th>結果</th></tr>
+      <tr>
+        <td><code>run_smoke.sh ... --no-train</code></td>
+        <td>01 子集 → 02/03/04/05 生成（mock）→ 06/07 過濾 → 08 人工抽查（含 reject 名單套用）→ 09 劣化
+          （含「跑第二次必須是 no-op」的斷言）→ 11 洩漏檢查 → 12 建實驗組 → 13（<code>--dry-run</code>）
+          → <code>export_rfdetr_coco.py</code> → 14/15/16（14 用 mock 預測代替真實訓練）</td>
+        <td><span class="badge good">SMOKE TEST OK</span> 全部通過；11 的洩漏檢查正確抓到合成資料裡
+          1 張 style 和 1 張 pseudo-label 跟 eval 集重複（<code>&lt;-- LEAK</code>），證明檢查邏輯有效，
+          不是沒抓到問題而是假資料本來就會重複</td>
+      </tr>
+      <tr>
+        <td><code>run_smoke.sh</code>（含真實訓練）</td>
+        <td>同上，但 13 是<b>真的</b>用 ultralytics 對 A0–A5 六組各訓練 1 epoch（160px, CPU），
+          14 也是真的用訓練出來的權重推論，15/16 產出真正的 mAP/recall/FP 統計 + bootstrap 信賴區間 + 通過/不通過表</td>
+        <td><span class="badge good">SMOKE TEST OK</span> → <code>results/report.md</code> 產出完整的
+          實驗組比較表。<b>數字本身毫無意義</b>（假資料、1 epoch、6 張合成"部署"驗證圖）——
+          這裡只是證明 13→16 的程式碼路徑（訓練、推論、COCO 風格 mAP 計算、paired bootstrap、
+          通過/不通過判定）在真實 ultralytics 訓練下能跑完，不是在下任何關於方法有效性的結論。</td>
+      </tr>
+    </table>
+    <div class="note">
+      連同前面的 02/06/07/09，<b>16 個步驟 + <code>export_rfdetr_coco.py</code> 現在全部至少跑過一次</b>
+      （真實生成模型只測了 02 的 t2i；03/04/05 的編輯類生成仍只驗證過 mock 版本，真正的 Qwen-Image-Edit
+      品質還是要等 GPU 環境）。
+    </div>
+
     <div class="note bad">
       <b>過程中抓到自己犯的 prompt 設計錯誤：</b>3 張被拒裡有 2 張（<code>neg_000002</code>、原本的
       <code>neg_000005</code>）不是生成模型亂畫，而是我自己把<b>真正的目標類別</b>寫進了場景/混淆物裡
@@ -415,6 +448,22 @@ degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
         <td><span class="badge warn">值得之後評估</span> 如果 08 人工抽查發現插入物件的陰影對不上，這是對應的解法方向。</td>
       </tr>
     </table>
+    <div class="note">
+      <b>深挖後的具體結論：</b>
+      <ul class="compact">
+        <li><b>AnyDoor</b> 官方 repo（<code>ali-vilab/AnyDoor</code>）有釋出程式碼/checkpoint，介面跟我們
+          05 步驟現在用的 FLUX.1-Fill<b>幾乎一樣</b>（參考物件圖+遮罩、目標位置遮罩）——真要換，
+          介面不用大改，但<b>授權沒有查到明確 LICENSE</b>，而且依賴的 DINOv2 本身歷史上帶非商用限制，
+          <b>商用前務必自己查清楚授權</b>，不要假設能直接用在公司內部產線。</li>
+        <li><b>ODGEN 沒有釋出程式碼</b>，而且它的 +25.3% 提升是建立在「針對目標領域資料微調擴散模型」之上
+          ——<b>這一步本身就需要真實的目標領域影像</b>，跟我們「不能蒐集新資料」的前提互相矛盾，
+          對我們來說實質上不可行，不只是成本高而已。</li>
+        <li><b>SpotLight 沒有找到可執行的程式碼</b>（論文的評估資料集也還在等釋出）。但<b>有現成可以今天直接跑的替代品</b>：
+          <code>ZHKKKe/Harmonizer</code>（ECCV 2022，GitHub 有code+權重）和 <code>WindVChen/INR-Harmonization</code>
+          （TCSVT 2023）都是推論即用的影像融合（harmonization）網路，可以接在 FLUX.1-Fill 貼上物件<b>之後</b>當後處理，
+          專門修補「貼上去的感覺」。如果之後 08 人工抽查發現插入物件陰影/色調對不上，這是現在就能試的工具，不用等 SpotLight 放出程式碼。</li>
+      </ul>
+    </div>
 
     <h3>7.2　生成資料的品質過濾：不只是單一 teacher 偵測器</h3>
     <table>
@@ -457,6 +506,15 @@ degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
       <span class="badge warn">未證實</span>：網路上有 blog 引用 Qwen-Image-Edit 在 GEdit-Bench 分數與 GPT-Image-1
       相近，但評分用的 judge 模型不同、不能直接比較，Qwen-Image-Edit-2511 也還沒有公開的基準數據。
     </p>
+    <div class="note bad">
+      <b>深挖後發現一個重要的授權問題：</b>開源權重版 <b>FLUX.1 Kontext [dev] 是 Black Forest Labs 的
+      Non-Commercial License</b>，只有 schnell（沒有編輯能力的那個變體）是 Apache-2.0。也就是說
+      <b>自架 FLUX.1 Kontext [dev] 用在公司內部的半導體廠產線上，嚴格來說需要跟 BFL 另外簽商用授權</b>，
+      不是下載權重就能直接商用。唯一找到的一篇系統化多模型評測（arXiv 2606.15570）把「物件移除」列為
+      <b>所有受測模型共同的最難項目</b>，不是 Kontext 特別弱——所以就算之後要比較，也不該預期任何一個模型
+      能把物件移除做到完美。目前選用 Qwen-Image-Edit-2509（其授權見其官方頁面，一般開源釋出的 Qwen 模型
+      多為 Apache-2.0 類寬鬆授權）在商用前提下反而是更穩妥的預設選擇，除非確認 BFL 授權條件可接受。
+    </div>
 
     <h3>7.5　實驗驗證的嚴謹度</h3>
     <ul class="compact">
@@ -511,6 +569,21 @@ degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
         <td><span class="badge warn">流程提醒</span> 之後補真實誤判物件到 <code>confusers</code> 時，要檢查寫的是不是
           不小心變成目標類別的另一種描述</td>
       </tr>
+      <tr>
+        <td>16 個步驟程式碼全部至少跑過一次</td>
+        <td>用 <code>tools/run_smoke.sh</code>（假資料 + mock，見第 6.4 節）把 03/04/05/08/10–16 這些先前
+          完全沒測過的程式碼路徑都跑了一遍，含一次真實 ultralytics 訓練（非 mock）。11 的洩漏檢查正確抓到
+          假資料裡的重複，09「跑兩次必須是 no-op」的斷言也成立。</td>
+        <td><span class="badge good">驗證通過</span> 程式碼邏輯層級沒有問題；<b>跟方法是否真的有效是兩回事</b>
+          ——假資料/1 epoch 跑出來的 mAP/recall 數字沒有任何參考價值，只是證明程式能跑完</td>
+      </tr>
+      <tr>
+        <td>FLUX.1 Kontext [dev] 商用授權是個坑</td>
+        <td>開源版是 Non-Commercial License，自架商用（例如用在公司內部廠務產線）需要另外跟 Black Forest Labs
+          簽約，不是下載權重就能用。</td>
+        <td><span class="badge warn">選型注意</span> 目前選用 Qwen-Image-Edit-2509 當預設更穩妥，但也要
+          自己核對一次它的授權條款，不要照搬本報告的假設</td>
+      </tr>
     </table>
   </section>
 
@@ -533,8 +606,11 @@ degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
         去把現場 NVR 真的誤判過的畫面挑出來，才是真正該填進 <code>confusers</code> 的內容。</li>
       <li>對照實際攝影機校正 CCTV 真實感參數（第 6.2 節）——魚眼畸變強度、OSD 時間戳記格式/位置、暈影強弱，
         都應該參考現場那幾支攝影機的真實錄影調整，不要照搬本報告的預設值。</li>
-      <li>小規模比較 <b>Qwen-Image-Edit-2509 vs. FLUX.1 Kontext</b> 在物件移除/風格轉換上的乾淨度
-        （第 7.4 節：文獻上沒有可查證的正面對比，需要自己實測才能知道哪個更適合）。</li>
+      <li>確認 Qwen-Image-Edit-2509 的授權條款可用於商業/廠內產線（第 7.4 節：FLUX.1 Kontext [dev] 開源版是
+        Non-Commercial License，自架商用需要另簽約，這點已經排除它當預設選項；Qwen-Image-Edit 的授權仍要
+        自己核對一次才能下定論）。</li>
+      <li>如果之後 05（插入）在人工抽查發現陰影/色調對不上，試試 <code>Harmonizer</code> 或
+        <code>INR-Harmonization</code> 這兩個現成可跑的融合後處理（第 7.1 節），不用等 SpotLight 放出程式碼。</li>
     </ul>
     <div class="note warn">
       本機這輪驗證的意義是「<b>確認程式碼與資料流本身沒問題</b>」，不是「<b>確認這個方法對產品有效</b>」——
