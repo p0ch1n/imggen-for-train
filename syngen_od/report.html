@@ -461,9 +461,42 @@ degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
         <li><b>SpotLight 沒有找到可執行的程式碼</b>（論文的評估資料集也還在等釋出）。但<b>有現成可以今天直接跑的替代品</b>：
           <code>ZHKKKe/Harmonizer</code>（ECCV 2022，GitHub 有code+權重）和 <code>WindVChen/INR-Harmonization</code>
           （TCSVT 2023）都是推論即用的影像融合（harmonization）網路，可以接在 FLUX.1-Fill 貼上物件<b>之後</b>當後處理，
-          專門修補「貼上去的感覺」。如果之後 08 人工抽查發現插入物件陰影/色調對不上，這是現在就能試的工具，不用等 SpotLight 放出程式碼。</li>
+          專門修補「貼上去的感覺」。</li>
       </ul>
     </div>
+
+    <h3>7.1b　實際裝起來試跑：Harmonizer</h3>
+    <p>
+      把 <code>ZHKKKe/Harmonizer</code> clone 下來（放在 <code>~/.cache/repos/Harmonizer</code>，刻意不放進
+      本專案 repo——下面會說明為什麼）、裝好 <code>kornia</code>/<code>opencv-python-headless</code>/<code>tqdm</code>、
+      下載官方預訓練權重（19MB，CPU 可跑，單張 &lt;1 秒），patch 了一行 <code>torch.load</code> 讓它在沒有 GPU
+      的環境也能載入（原始 checkpoint 是存成 CUDA tensor，純 CPU 機器預設會報錯）。
+    </p>
+    <div class="note bad">
+      <b>裝起來之後第一件事就發現：Harmonizer 本身的授權是
+      <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode">CC BY-NC-SA 4.0</a>
+      ——一樣是非商用</b>。也就是說上面 7.1 節講的「現成可以直接用」要修正：<b>可以直接跑起來驗證效果，
+      但不能直接用在公司商業產線上</b>，跟 FLUX.1 Kontext 的授權問題是同一類坑。這點我自己在推薦的時候
+      也漏講了，寫這裡更正。
+    </div>
+    <figure>
+      <img src="_local_run/harmonizer_demo.png" alt="Harmonizer 官方範例效果">
+      <figcaption>官方自帶的 3 組範例（貓 / 人物 / 食物），上：composite 合成圖，中：前景遮罩，下：harmonized 結果。
+        效果看得出來：前景色調被往背景的光源/色溫方向拉近（例如貓的毛色、人物夾克的色調都變暖，貼合背景的燈光）。</figcaption>
+    </figure>
+    <figure>
+      <img src="_local_run/harmonizer_fab_test.png" alt="套用在我們自己 CCTV 圖上的測試">
+      <figcaption>自己做的測試：把一張色溫完全不對（偏橘、過曝）的圖貼到我們生成的辦公室 CCTV 場景裡，模擬
+        「插入物件色調不合」的狀況，再跑 Harmonizer。右邊明顯沒那麼橘、曝光也拉低了，往背景的日光燈冷色調靠。
+        <b>但矩形邊緣的硬切邊沒有變——Harmonizer 只管色調/光照一致性，不管遮罩邊緣的融合</b>，
+        實際用在 05 插入步驟時，邊緣柔化（現有 <code>DiffusionInpaintRemove</code> 已經在做的 Gaussian blur 遮罩）
+        還是要另外處理，兩者是互補、不是二選一。</figcaption>
+    </figure>
+    <p>
+      結論：<b>技術上可行、效果看得出來</b>，但授權排除了它當正式方案；如果真的要走這條路，
+      要嘛找商用授權的替代品（<code>WindVChen/INR-Harmonization</code> 的授權還沒查證，需要之後再確認），
+      要嘛跟作者談商用授權，要嘛接受只在內部實驗階段用、正式產線上拿掉這一步。
+    </p>
 
     <h3>7.2　生成資料的品質過濾：不只是單一 teacher 偵測器</h3>
     <table>
@@ -609,8 +642,9 @@ degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
       <li>確認 Qwen-Image-Edit-2509 的授權條款可用於商業/廠內產線（第 7.4 節：FLUX.1 Kontext [dev] 開源版是
         Non-Commercial License，自架商用需要另簽約，這點已經排除它當預設選項；Qwen-Image-Edit 的授權仍要
         自己核對一次才能下定論）。</li>
-      <li>如果之後 05（插入）在人工抽查發現陰影/色調對不上，試試 <code>Harmonizer</code> 或
-        <code>INR-Harmonization</code> 這兩個現成可跑的融合後處理（第 7.1 節），不用等 SpotLight 放出程式碼。</li>
+      <li>Harmonizer 已經裝起來驗證過技術上可行（第 7.1b 節），但<b>授權是 CC BY-NC-SA 4.0，非商用</b>——
+        正式產線要嘛確認 <code>INR-Harmonization</code> 的授權可商用，要嘛只在內部實驗階段用它來判斷
+        「色調一致有沒有幫助」，正式上線前要換成授權乾淨的方案或拿掉這一步。</li>
     </ul>
     <div class="note warn">
       本機這輪驗證的意義是「<b>確認程式碼與資料流本身沒問題</b>」，不是「<b>確認這個方法對產品有效</b>」——
