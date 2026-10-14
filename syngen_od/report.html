@@ -622,14 +622,15 @@ degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
 
   <section id="next">
     <h2><span class="num">9.</span>尚未完成 / 下一步</h2>
-    <p>這次只驗證了 <b>02 → 06 → 07 → 09</b> 這條支線，而且生成端是用品質較弱的 sd-turbo 代打。距離真正能做出
-      可行性結論，還缺：</p>
+    <p>16 個步驟的<b>程式碼路徑</b>現在都至少跑過一次（02/06/07/09 用真實的 sd-turbo+YOLOv8n 跑過，
+      03/04/05/08/10–16 用假資料+mock 驗證過邏輯，見第 6.4 節），而且生成端目前最好的也只是品質較弱的
+      sd-turbo 代打。距離真正能做出可行性結論，還缺：</p>
     <ul class="compact">
       <li><b>最重要、目前完全沒有的東西：</b> <code>deploy_eval</code>（200–500 張已標註真實部署畫面）與
         <code>deploy_bg</code>（200+ 張確認無目標物的真實畫面）。沒有這兩組真實資料，任何實驗組的分數都無法驗證——
         合成資料不能拿來評估合成資料。</li>
-      <li>Step 03（Qwen-Image-Edit 去除人物）、04（風格轉換）完全沒測試過——sd-turbo 是純文字生成模型，沒有編輯能力，
-        這兩步在本機無法用 sd-turbo 代打，必須等正式的 Qwen-Image-Edit-2509。</li>
+      <li>Step 03（Qwen-Image-Edit 去除人物）、04（風格轉換）只測過 mock 版本，<b>真正的編輯模型完全沒試過</b>
+        ——sd-turbo 是純文字生成模型，沒有編輯能力，沒辦法像 02 那樣在本機代打，必須等正式的 Qwen-Image-Edit-2509。</li>
       <li>正式生成品質：需要在有 GPU、有網路的機器上跑 <code>offline/prepare_bundle.sh</code>，
         下載 Qwen-Image、Qwen-Image-Edit-2509、Lightning LoRA、RF-DETR-Large 等權重，打包後搬進隔離 GPU 環境。</li>
       <li>完整 A0–A5 對照實驗（13 訓練 → 14 預測 → 15 評估 → 16 比較），套用
