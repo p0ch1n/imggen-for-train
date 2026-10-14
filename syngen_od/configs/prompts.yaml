@@ -1,0 +1,119 @@
+# =====================================================================================
+#  Prompts. Domain: semiconductor fab + office + perimeter CCTV (indoor corridors/cleanroom,
+#  office areas, loading docks/yards, perimeter fencing/gates). Edit `negatives.confusers` first:
+#  add the actual false-positive objects you've seen on YOUR cameras -- these are a starting set
+#  based on common fab/office/perimeter clutter, not a substitute for looking at real footage.
+#  Prompts are in English (Qwen-Image also supports Chinese, but English gives more stable composition).
+# =====================================================================================
+
+# ---------- 02 hard negatives: prompt = "{view}, {scene}, with {confuser}, {condition}. {suffix}"
+negatives:
+  views:
+    # indoor dome/corner CCTV -- most of a fab/office estate's cameras are these
+    - "ceiling-mounted dome CCTV camera, wide-angle fisheye view down a corridor"
+    - "wide-angle CCTV camera mounted high in a room corner, looking down at an oblique angle"
+    - "overhead CCTV view directly above a factory floor aisle"
+    - "CCTV camera above an entrance turnstile, chest-height view of the gate lane"
+    - "security camera in an elevator lobby, wide-angle view toward the elevator doors"
+    # perimeter / outdoor
+    - "outdoor pole-mounted perimeter security camera, wide-angle view along a fence line"
+    - "CCTV camera above a loading dock roller door, looking out at the yard"
+    - "PTZ security camera view from a building corner, elevated angle"
+    - "security camera above a vehicle gate at a factory entrance"
+  scenes:
+    # indoor fab / cleanroom-adjacent
+    - "a semiconductor fab cleanroom gowning area with suit lockers"
+    - "an empty cleanroom corridor with raised floor tiles"
+    - "a fab sub-fab utility chase area with pipes and cable trays"
+    - "a warehouse stockroom aisle with tall shelving racks"
+    - "a loading dock bay with roller doors, no trucks present"
+    - "a server room with rack cabinets"
+    # office
+    - "an empty open-plan office area after hours"
+    - "an office corridor with cubicles visible through glass partitions"
+    - "a stairwell landing in an office building"
+    - "an elevator lobby with reflective floor tiles"
+    - "a break room with vending machines"
+    # perimeter / outdoor
+    - "an outdoor factory perimeter fence line"
+    - "an empty employee parking lot outside an office building"
+    - "a vehicle gate and security checkpoint at a factory entrance"
+    - "a gas cylinder storage yard behind an industrial building"
+    - "a covered walkway between two buildings"
+    - "a smoking / outdoor break area next to a building wall"
+  confusers:                    # objects that tend to be misdetected as person / car on fab/office/perimeter cameras
+    - "a cleanroom bunny suit hanging upright on a gowning rack"
+    - "a row of cleanroom suits hanging on a rack, backlit"
+    - "an upright industrial gas cylinder (nitrogen or argon tank)"
+    - "a stack of wafer FOUP boxes on a transport cart"
+    - "an idle AGV (automated guided vehicle) robot parked in the corridor"
+    - "a mannequin or safety-training dummy standing upright"
+    - "a red fire extinguisher cabinet mounted on the wall"
+    - "a floor-standing air shower or HEPA filter unit"
+    - "a stack of flattened cardboard boxes"
+    - "a stack of stacked plastic chairs"
+    - "a tall vending machine"
+    - "a hi-vis safety vest and hard hat hanging on a wall hook"
+    - "a mop and bucket left standing in a corridor"
+    - "an open server rack cabinet door"
+    - "a security guard's empty chair and podium at a checkpoint"
+    - "a parked hand truck or delivery cart"
+    - "a large potted plant"
+    - "a concrete pillar casting a long shadow under fluorescent light"
+    - "a stationary articulated robot arm"
+    - "a rolled-up yellow wet-floor caution sign standing open"
+    - "traffic cones and safety barrels near a vehicle gate"
+    - "a stack of pallets wrapped in white plastic shrink wrap"
+    - "an empty metal bike rack with no bicycles"
+    - "a utility golf cart parked and empty"
+    - "a large dumpster and recycling bins"
+  conditions:
+    - "flat greenish-white fluorescent office lighting"
+    - "bright white cleanroom lighting"
+    - "yellow-filtered lighting as used in semiconductor lithography bays"
+    - "dim corridor at night lit only by exit signs"
+    - "overcast daylight"
+    - "bright midday sun through windows with hard glare"
+    - "night, lit by sodium-orange outdoor floodlights"
+    - "light rain at night near the vehicle gate"
+    - "dusk, low light"
+  suffix: "Realistic security camera photo, no people, no humans, no vehicles."
+  negative_prompt: "person, people, human, man, woman, child, pedestrian, crowd, body, face, car, vehicle, truck, bus, motorcycle, bicycle, text, watermark"
+  # Note: cleanroom bunny suits / mannequins are intentionally human-shaped -- whether they should count
+  # as "person" depends on your labelling convention. If they should NOT be detected, keep them as
+  # confusers here. If forklifts/AGVs should also not trigger "truck"/"car", add them too.
+
+# ---------- 03 people removal
+remove:
+  prompt: "Remove all people from the image and fill in the background naturally so that no trace of them remains. Keep everything else in the image exactly the same, including the camera angle, lighting, and all other objects."
+  negative_prompt: " "
+
+# ---------- 04 label-preserving style transfer: every object must stay in place
+style:
+  suffix: " Keep the composition, camera angle, and every person, vehicle, and object exactly in the same position, size, and pose. Do not add or remove anything."
+  negative_prompt: " "
+  styles:
+    night_streetlight: "Change the scene to nighttime outdoors, lit only by sodium-orange floodlights."
+    night_ir: "Make it look like a black-and-white infrared night-vision security camera image."
+    rain: "Make it a rainy day with visible rain streaks and wet reflective ground."
+    fog: "Add light haze that reduces visibility in the distance."
+    fluorescent_office: "Change the lighting to flat greenish-white fluorescent office/corridor lighting."
+    cleanroom_yellow: "Change the lighting to the yellow-filtered light used in semiconductor cleanroom lithography bays."
+    dusk_backlight: "Change the lighting to dusk with strong backlight from a low sun through windows or a loading dock door."
+    overcast: "Change the lighting to a dull overcast day with flat light."
+    cctv_lowres: "Make it look like a low-quality, low-resolution CCTV security camera frame with compression artifacts and slight color cast."
+    harsh_glare: "Change the lighting to harsh fluorescent glare with strong reflections off the floor."
+
+# ---------- 05 inpaint insertion (optional)
+insert:
+  objects:
+    person:
+      - "a person in a cleanroom bunny suit walking, seen from a distance, matching the scene lighting"
+      - "an office worker walking down a corridor, realistic, matching the scene lighting"
+      - "a person standing near a doorway, partially in shadow, matching the scene lighting"
+      - "a person in dark clothes walking at night near a perimeter fence, realistic"
+      - "a crouching or bending person near equipment, realistic, matching the scene lighting"
+    car:
+      - "a parked sedan car in an employee parking lot, realistic, matching the scene lighting and perspective"
+      - "a white delivery van at a loading dock, realistic, matching the scene lighting and perspective"
+      - "a small hatchback car seen from the side in a parking lot, realistic"

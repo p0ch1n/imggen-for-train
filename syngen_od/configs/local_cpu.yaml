@@ -1,0 +1,57 @@
+# Local CPU smoke run (this laptop/container has no GPU and no Qwen-Image weights yet).
+# Uses sd-turbo (small SD model, already downloaded to models/sd-turbo) as a cheap stand-in for
+# Qwen-Image, just to validate the 02_gen_neg_t2i prompts and pipeline plumbing before the real
+# run on the isolated GPU box with Qwen-Image / Qwen-Image-Edit-2509 (see README offline bundle).
+# Standalone (no `extends`) on purpose: sd-turbo's pipeline doesn't accept Qwen's true_cfg_scale kwarg.
+root: /home/kasm-user/_syngen_local_run   # kept off the gcsfuse-backed Personal_Data mount: fast local scratch
+seed: 0
+prompts_file: configs/prompts.yaml
+classes: [person, bicycle, car, motorcycle, bus, truck]   # must match pipeline.yaml's production class list
+
+degrade:
+  p_rescale: 0.7
+  rescale: [0.4, 1.0]
+  p_blur: 0.3
+  blur_radius: [0.3, 1.2]
+  p_noise: 0.5
+  noise_sigma: [2, 8]
+  p_jpeg: 0.8
+  jpeg_quality: [35, 90]
+  # New realism knobs (default 0 elsewhere, so existing configs are unaffected):
+  p_vignette: 0.5           # safe for every task: brightness-only, doesn't move pixels/boxes
+  vignette_strength: [0.3, 0.6]
+  p_osd: 0.6                # safe for every task: draws into a corner, doesn't move existing content
+  osd_ir: false
+  p_fisheye: 0.5            # CAUTION: warps pixel positions -- only safe for neg_t2i (no real boxes to
+  fisheye_k: [0.15, 0.35]   # invalidate). Do NOT enable for remove/style tasks unless boxes are also warped.
+
+teacher:
+  backend: ultralytics
+  weights: /home/kasm-user/.cache/models/yolov8n.pt   # small COCO-pretrained model, CPU-friendly; just for local QC
+  conf: 0.05
+  iou: 0.7
+  imgsz: 640
+  batch: 4
+  device: cpu
+
+paths:
+  gen: ${root}/data/gen
+
+generation:
+  t2i:
+    backend: diffusers
+    model_path: /home/kasm-user/.cache/models/sd-turbo   # local copy; gcsfuse mmap reads were ~0.9MB/s
+    variant: fp16            # the only weight files present are model.fp16.safetensors
+    dtype: float32           # CPU: fp16 compute kernels are unsupported/slow, upcast after loading
+    steps: 2                 # sd-turbo is a distilled few-step model (1-4 steps)
+    guidance_scale: 0.0      # sd-turbo was trained for CFG-free sampling
+    offload: none
+    device: cpu
+
+tasks:
+  neg_t2i:
+    out: ${paths.gen}/neg_t2i_fab   # new domain batch; keeps the earlier generic-domain run intact for comparison
+    num_images: 60
+    sizes: [[512, 512]]     # sd-turbo's native resolution
+    filter:
+      phantom_conf: 0.25

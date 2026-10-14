@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>syngen_od 可行性研究報告</title>
+<style>
+  :root{
+    --bg:#f7f7f8; --panel:#ffffff; --text:#1b1d1f; --muted:#5b6066; --border:#e3e5e8;
+    --accent:#2563eb; --good:#15803d; --bad:#b91c1c; --warn:#b45309;
+    --code-bg:#1e1e2e; --code-text:#e2e2f0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#15171a; --panel:#1d2024; --text:#e8e9eb; --muted:#9aa0a6; --border:#2d3136; }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif;
+    line-height:1.7;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:40px 20px 100px}
+  header.title{margin-bottom:36px}
+  header.title h1{font-size:1.9rem; margin:0 0 8px}
+  header.title .sub{color:var(--muted); font-size:0.95rem}
+  .meta-row{display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; font-size:0.85rem; color:var(--muted)}
+  .meta-row span b{color:var(--text)}
+  nav.toc{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:18px 22px; margin-bottom:40px}
+  nav.toc h2{font-size:0.8rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px}
+  nav.toc ol{margin:0; padding-left:1.2em; columns:2; column-gap:30px}
+  nav.toc a{color:var(--accent); text-decoration:none}
+  nav.toc a:hover{text-decoration:underline}
+  section{margin-bottom:52px}
+  section h2{font-size:1.35rem; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:18px;
+    display:flex; align-items:center; gap:10px}
+  section h2 .num{color:var(--accent); font-variant-numeric:tabular-nums}
+  h3{font-size:1.05rem; margin:24px 0 10px}
+  p{margin:0 0 14px}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px 24px; margin:16px 0}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:700px){.grid2{grid-template-columns:1fr} nav.toc ol{columns:1}}
+  table{width:100%; border-collapse:collapse; font-size:0.88rem; margin:14px 0}
+  th,td{border-bottom:1px solid var(--border); padding:8px 10px; text-align:left; vertical-align:top}
+  th{color:var(--muted); font-weight:600; font-size:0.8rem; text-transform:uppercase; letter-spacing:.03em}
+  tr:last-child td{border-bottom:none}
+  code{background:var(--code-bg); color:var(--code-text); padding:1px 6px; border-radius:4px; font-size:0.85em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg); color:var(--code-text); padding:16px 18px; border-radius:10px; overflow-x:auto;
+    font-size:0.82rem; line-height:1.55}
+  pre code{background:none; padding:0}
+  .badge{display:inline-block; padding:2px 10px; border-radius:999px; font-size:0.75rem; font-weight:600}
+  .badge.good{background:#dcfce7; color:var(--good)}
+  .badge.bad{background:#fee2e2; color:var(--bad)}
+  .badge.warn{background:#fef3c7; color:var(--warn)}
+  @media (prefers-color-scheme: dark){
+    .badge.good{background:#052e16; color:#4ade80}
+    .badge.bad{background:#450a0a; color:#f87171}
+    .badge.warn{background:#451a03; color:#fbbf24}
+  }
+  .stat-row{display:flex; gap:14px; flex-wrap:wrap; margin:16px 0}
+  .stat{flex:1; min-width:140px; background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:16px 18px; text-align:center}
+  .stat .n{font-size:1.7rem; font-weight:700}
+  .stat .l{color:var(--muted); font-size:0.78rem; margin-top:4px}
+  figure{margin:18px 0}
+  figure img{width:100%; border-radius:10px; border:1px solid var(--border); display:block}
+  figcaption{color:var(--muted); font-size:0.82rem; margin-top:8px; text-align:center}
+  .note{border-left:3px solid var(--accent); background:var(--panel); padding:12px 16px; border-radius:0 8px 8px 0;
+    font-size:0.92rem; margin:16px 0}
+  .note.warn{border-color:var(--warn)}
+  .note.bad{border-color:var(--bad)}
+  .flow{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.78rem; background:var(--code-bg);
+    color:var(--code-text); padding:18px; border-radius:10px; overflow-x:auto; white-space:pre}
+  .arm-table td.reject{color:var(--bad)}
+  footer{color:var(--muted); font-size:0.8rem; text-align:center; margin-top:60px; padding-top:20px; border-top:1px solid var(--border)}
+  ul.compact{margin:0 0 14px; padding-left:1.3em}
+  ul.compact li{margin-bottom:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="title">
+    <h1>以生成式影像資料改善 CCTV 物件偵測模型 — 可行性研究報告</h1>
+    <div class="sub">專案代號 <code>syngen_od</code> ｜ 不蒐集新資料、用影像生成/編輯模型（Qwen-Image / Qwen-Image-Edit）合成訓練資料，解決上線後的漏偵測與誤判問題</div>
+    <div class="meta-row">
+      <span>報告日期：<b>2026-10-14</b></span>
+      <span>階段：<b>本機（無 GPU）流程驗證</b></span>
+      <span>狀態：<b style="color:var(--good)">Pipeline 全流程已跑通</b></span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <h2>目錄</h2>
+    <ol>
+      <li><a href="#background">背景與問題</a></li>
+      <li><a href="#principle">方法原理</a></li>
+      <li><a href="#method">專案架構與流程</a></li>
+      <li><a href="#env">執行環境與踩過的坑</a></li>
+      <li><a href="#results">本次執行結果</a></li>
+      <li><a href="#domain">強化：半導體廠/辦公室 CCTV 情境</a></li>
+      <li><a href="#sota">最先進方法調查（2024–2025）</a></li>
+      <li><a href="#findings">關鍵發現</a></li>
+      <li><a href="#next">尚未完成 / 下一步</a></li>
+    </ol>
+  </nav>
+
+  <section id="background">
+    <h2><span class="num">1.</span>背景與問題</h2>
+    <p>
+      目前上線的物件偵測模型，是以 <b>COCO 資料集</b>訓練出的通用模型（<code>person</code>、<code>car</code> 等通用類別），
+      部署在實際的 <b>CCTV 即時監控</b>場景中運作。上線後觀察到兩類錯誤：
+    </p>
+    <ul class="compact">
+      <li><b>誤判（False Positive）</b>：場景中的草地土堆、石頭、樹樁、暗影等「長得像人/車」的物體被誤判為目標類別。</li>
+      <li><b>漏偵測（False Negative）</b>：夜間、雨霧、低解析度等真實攝影機條件下，目標物偵測不到。</li>
+    </ul>
+    <p>
+      標準解法是蒐集更多真實場景資料重新標註訓練，但<b>訓練模型所在的環境被限制、不能對外蒐集新資料</b>
+      （沒有網路存取、無法匯入新的現場影像），因此退而求其次：用生成式影像模型在既有的 COCO 影像基礎上
+      「合成」出像誤判/漏偵測場景的訓練資料，看能不能在不違反資料限制的前提下改善模型。
+    </p>
+  </section>
+
+  <section id="principle">
+    <h2><span class="num">2.</span>方法原理</h2>
+    <p>核心想法分兩條路線，分別對應上面兩種錯誤：</p>
+    <div class="grid2">
+      <div class="card">
+        <h3 style="margin-top:0">A. 降低誤判 → 合成「難負樣本」</h3>
+        <p>用 <b>Qwen-Image</b>（文字生成影像）直接生成「長得像人/車但其實不是」的場景
+          （土堆、石頭、樹樁、垃圾袋、帳篷防水布⋯），標成「背景、無目標物」。
+          另外用 <b>Qwen-Image-Edit</b> 把既有 COCO 影像裡的人「去除」，生成去掉人之後的配對負樣本（背景保持不變）。
+          讓模型看過夠多「像人但不是人」的樣本，降低對這些混淆物的誤判。</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">B. 降低漏偵測 → 保標籤的風格轉換</h3>
+        <p>用 <b>Qwen-Image-Edit</b> 對同一張已標註的 COCO 影像做風格轉換（夜視、雨天、起霧、低解析度 CCTV 畫質⋯），
+          <b>要求物體位置、大小、姿勢完全不變</b>，因此原本的標註框可以直接沿用。
+          讓模型在惡劣條件下也看過同樣的目標物長相，改善夜間/雨霧下的漏偵測。</p>
+      </div>
+    </div>
+    <p>
+      但生成模型不可靠——可能把人也一起生成進「負樣本」、可能在編輯時把物體移位或消失、可能產生幻覺物件。
+      所以整條流程設計了<b>自動品質把關機制</b>：用另一個獨立的「teacher 偵測模型」檢查生成結果，
+      加上不需要模型的「結構相似度」比對（確認編輯前後除了要求的改變之外，畫面結構沒有跑掉），
+      雙重過濾掉不合格的生成圖，不合格就直接丟棄，不依賴人工全部看過一遍。
+    </p>
+    <p>
+      最後，不是「生成資料 = 有效」就直接上線，而是用<b>對照實驗</b>驗證：把新資料加進訓練集、與「只延長訓練時間但資料不變」
+      的對照組比較，用真實部署畫面（而非合成資料）當作評估基準，統計上顯著才算數，避免把生成資料的「幻覺改善」誤認成真的進步。
+    </p>
+  </section>
+
+  <section id="method">
+    <h2><span class="num">3.</span>專案架構與流程</h2>
+    <p><code>syngen_od/</code> 專案把整個流程拆成 16 個可重入（resumable）、可分片（multi-GPU shard）的腳本：</p>
+    <div class="flow">                    ┌─ 02 Qwen-Image 文字生成難負樣本 ─┐
+COCO ─ 01 取子集 ───┼─ 03 Qwen-Image-Edit 去除人物（配對負樣本）─┼─ 06 teacher 偵測 ─ 07 自動過濾 ─ 08 人工抽查 ─ 09 相機劣化 ─┐
+                    └─ 04 Qwen-Image-Edit 風格轉換（保標籤）──┘                                                      │
+部署畫面（未標註）─ 06 teacher ─ 10 偽標籤 ─ (05 補插入小物件，optional) ──────────────────────────────────────────┤
+                                                                                                                  ▼
+                        11 資料洩漏檢查 ─ 12 建構實驗組 A0–A5 ─ 13 微調訓練 ─ 14 預測 ─ 15 評估 ─ 16 比較 + 通過/不通過判定</div>
+    <table>
+      <tr><th>實驗組</th><th>訓練資料</th><th>要回答的問題</th></tr>
+      <tr><td><code>A0</code>（對照組）</td><td>只有 COCO 子集</td><td>單純延長訓練時間本身有沒有幫助？（必須跑，當基準）</td></tr>
+      <tr><td><code>A1</code></td><td>+ 難負樣本（02+03）</td><td>誤判有沒有下降？</td></tr>
+      <tr><td><code>A2</code></td><td>+ 風格轉換（04）</td><td>夜間/雨霧下的漏偵測有沒有改善？</td></tr>
+      <tr><td><code>A3</code></td><td>A1+A2</td><td>兩種效果會不會疊加？</td></tr>
+      <tr><td><code>A4</code></td><td>+ 真實部署畫面偽標籤（10）</td><td>非生成式的基準線（通常最強）</td></tr>
+      <tr><td><code>A5</code>（optional）</td><td>+ 插入小物件（05）</td><td>遠處小目標的偵測有沒有改善？</td></tr>
+    </table>
+    <p>完整流程設計要在<b>有 GPU、離線的隔離環境</b>執行（用 <code>offline/prepare_bundle.sh</code> 把 Qwen-Image、
+      Qwen-Image-Edit-2509、RF-DETR 等權重打包搬進去）。本報告記錄的是先在<b>這台沒有 GPU 的本機</b>上，
+      驗證程式碼與流程本身是否跑得通。</p>
+  </section>
+
+  <section id="env">
+    <h2><span class="num">4.</span>執行環境與踩過的坑</h2>
+    <div class="stat-row">
+      <div class="stat"><div class="n">0</div><div class="l">GPU（CPU only，2 vCPU / 7.7GB RAM）</div></div>
+      <div class="stat"><div class="n">gcsfuse</div><div class="l"><code>Personal_Data</code> 掛載方式</div></div>
+      <div class="stat"><div class="n">sd-turbo</div><div class="l">本機唯一已下載的生成模型</div></div>
+    </div>
+    <h3>坑 1：gcsfuse 上用 mmap 讀模型權重極慢</h3>
+    <p><code>/home/kasm-user/Personal_Data</code> 是掛在 <b>gcsfuse</b>（GCS 網路硬碟）上的。<code>diffusers</code>
+      讀 <code>.safetensors</code> 預設用 <code>mmap</code>，在 gcsfuse 上會變成大量隨機小區塊讀取：
+      實測讀取速度只有約 <b>0.9 MB/s</b>，2.5GB 的模型要讀 <b>近 50 分鐘</b>才會載入完成。</p>
+    <p>對照：把同一份模型用 <code>cp -r</code> 整包<b>循序複製</b>到本機磁碟，2.5GB 只花了 <b>21.5 秒</b>
+      （約 116 MB/s）。結論：<b>任何要被模型讀取的權重檔，一律先搬到非 gcsfuse 的本機路徑，再做推論</b>；
+      純粹的大檔案循序搬移走 gcsfuse 沒問題，問題出在推論時的隨機讀取模式。</p>
+    <h3>坑 2：Python venv 也不能建在 gcsfuse 上</h3>
+    <p>在 <code>Personal_Data</code> 底下建 venv / <code>pip install</code> 涉及大量小檔案的建立與刪除，
+      同樣會被 gcsfuse 拖慢到幾乎卡死（一個 <code>rm -rf venv</code> 跑了 10 分鐘以上都刪不完）。
+      改到本機路徑 <code>/home/kasm-user/.venvs/syngen_od</code> 建立後，秒建秒裝。</p>
+    <h3>坑 3：torch / torchvision 版本需要同一個 index 來源</h3>
+    <p>一開始把整個 <code>pip install</code> 指令都指定 <code>--index-url .../whl/cpu</code>，
+      結果連 <code>pyyaml</code> 這種純 Python 套件也只能在 PyTorch 的 CPU wheel 索引裡找，裝不到而失敗
+      ——該 index 只拆成 <code>torch</code> 單獨裝，其餘套件走預設 PyPI。
+      之後裝 <code>ultralytics</code> 時，它又自動帶入一個跟現有 <code>torch</code> build 不匹配的 <code>torchvision</code>
+      （ABI 不合，<code>operator torchvision::nms does not exist</code>），改成重新從同一個 CPU index 裝
+      <code>torchvision</code> 才解決。</p>
+    <p>最終環境：<code>torch 2.14.1+cpu</code>、<code>diffusers 0.41.0</code>、<code>transformers 5.19.0</code>、
+      <code>torchvision 0.29.1+cpu</code>、<code>ultralytics 8.4.177</code>。</p>
+    <h3>本機測試用的設定檔</h3>
+    <p>新增 <code>configs/local_cpu.yaml</code>（獨立設定檔，刻意不用 <code>extends: pipeline.yaml</code>，
+      因為 sd-turbo 的 pipeline 不接受 Qwen 專用的 <code>true_cfg_scale</code> 參數）：</p>
+    <pre><code>root: /home/kasm-user/_syngen_local_run   # 不放 gcsfuse，放本機快速磁碟
+classes: [person, bicycle, car, motorcycle, bus, truck]
+
+generation:
+  t2i:
+    backend: diffusers
+    model_path: /home/kasm-user/.cache/models/sd-turbo   # 本機複製，不是 gcsfuse 原路徑
+    variant: fp16
+    dtype: float32       # CPU 上 fp16 運算核心支援差，載入後升回 float32
+    steps: 2              # sd-turbo 是 1-4 步蒸餾模型
+    guidance_scale: 0.0   # sd-turbo 建議的免 CFG 推論
+
+teacher:
+  backend: ultralytics
+  weights: /home/kasm-user/.cache/models/yolov8n.pt   # 小型 COCO 預訓練模型，CPU 夠快
+
+degrade: {...}   # 沿用 pipeline.yaml 預設的相機劣化參數</code></pre>
+  </section>
+
+  <section id="results">
+    <h2><span class="num">5.</span>本次執行結果</h2>
+    <p class="note">這一節是<b>第一輪跑通測試</b>，用的是專案原本附帶的通用範例 prompt（公園草地、農地⋯）。
+      之後把 prompt 改寫成實際部署情境（半導體廠/辦公室/周邊）並加上 CCTV 真實感後處理，見第 6 節。</p>
+
+    <h3>5.1　Step 02：文字生成難負樣本（sd-turbo 代打）</h3>
+    <p>執行 <code>scripts/02_gen_neg_t2i.py --config configs/local_cpu.yaml --limit 20</code>，
+      用 <code>prompts.yaml</code> 裡定義的視角 × 場景 × 混淆物 × 天候組合生成 20 張。
+      CPU 上一張約 <b>95–110 秒</b>（512×512、2 步）。</p>
+    <figure>
+      <img src="_local_run/contact_sheet.png" alt="20 張生成樣本總覽">
+      <figcaption>生成的 20 張難負樣本總覽（含各自的 prompt）。視角、場景、混淆物、天候都有覆蓋到；構圖大致合理。</figcaption>
+    </figure>
+    <p>注意：這批圖是 <b>sd-turbo</b>（小型 SD1.5 系 2 步蒸餾模型）生的，<b>不是</b>正式方案要用的 Qwen-Image，
+      品質與 prompt 遵從度明顯較弱，只用來驗證流程本身跑不跑得通。</p>
+
+    <h3>5.2　Step 06 + 07：Teacher 偵測 + 自動過濾</h3>
+    <p>Teacher 換成 <b>YOLOv8n</b>（COCO 80 類預訓練，CPU 上 0.88 秒/張；正式方案設計用的是 RF-DETR-Large，在無 GPU 機器上太重）。</p>
+    <div class="stat-row">
+      <div class="stat"><div class="n">20</div><div class="l">檢查張數</div></div>
+      <div class="stat"><div class="n" style="color:var(--good)">17</div><div class="l">通過（85.0%）</div></div>
+      <div class="stat"><div class="n" style="color:var(--bad)">3</div><div class="l">被拒：target_detected</div></div>
+    </div>
+    <figure>
+      <img src="_local_run/neg_000003_det.jpg" alt="neg_000003 被拒">
+      <figcaption><code>neg_000003</code>（停車場場景）— 畫面中多台真車被偵測到，car 信心值達 0.87 / 0.93，明確洩漏，正確剔除。</figcaption>
+    </figure>
+    <div class="grid2">
+      <figure>
+        <img src="_local_run/neg_000002_det.jpg" alt="neg_000002 被拒">
+        <figcaption><code>neg_000002</code>（工地場景）— 小貨櫃被判成 car 0.78 / truck 0.48，可能是 teacher 自己對小物件的誤判，保守起見一樣剔除。</figcaption>
+      </figure>
+      <figure>
+        <img src="_local_run/neg_000017_det.jpg" alt="neg_000017 被拒">
+        <figcaption><code>neg_000017</code>（行車記錄儀視角）— 對向車道一台車，car 0.58，剔除。</figcaption>
+      </figure>
+    </div>
+    <div class="note">
+      這結果<b>具體驗證了 06/07 這道自動品質關卡不是多餘的</b>：20 張裡有 15% 真的混進了目標類別，
+      如果沒過濾直接拿去當「背景、無目標物」的訓練資料，等於在教模型「看到車也不要偵測」，會讓誤判問題更糟。
+    </div>
+
+    <h3>5.3　Step 09：相機劣化</h3>
+    <p>對通過的 17 張套用 <code>degrade()</code>（隨機縮放模糊化 + 高斯模糊 + 感光雜訊 + JPEG 壓縮，沿用
+      <code>pipeline.yaml</code> 預設參數），讓生成圖不要「太乾淨」而被模型學成捷徑特徵。</p>
+    <figure>
+      <img src="_local_run/zoom_compare.png" alt="劣化前後局部放大對比">
+      <figcaption>局部放大對比（<code>neg_000006</code>）：左＝乾淨原圖，右＝套用相機劣化後。細節明顯變模糊、有壓縮痕跡。
+        檔案大小從 163KB 降到 94KB。</figcaption>
+    </figure>
+    <figure>
+      <img src="_local_run/before_after.png" alt="五張縮圖的劣化前後對比">
+      <figcaption>5 張縮圖尺度下的劣化前後對比（上：乾淨／下：劣化後）；縮圖尺度下差異較不明顯，但量化上確實有差。</figcaption>
+    </figure>
+  </section>
+
+  <section id="domain">
+    <h2><span class="num">6.</span>強化：半導體廠/辦公室 CCTV 情境</h2>
+    <p>
+      上一輪的 prompt（草地、農地、工地、河岸⋯）是通用範例，不是實際部署場景。這一輪把
+      <code>configs/prompts.yaml</code> 整個改寫成<b>半導體廠房 + 辦公室 + 周邊門禁</b>情境，
+      並在 <code>syngen/imgutil.py</code> 加了三個確定性（非生成模型）的後處理效果，讓畫面更像真的監視器錄影。
+    </p>
+
+    <h3>6.1　場景/混淆物改寫：從「公園草地」到「廠務/辦公室」</h3>
+    <table>
+      <tr><th></th><th>改寫前（通用範例）</th><th>改寫後（半導體廠+辦公室+周邊）</th></tr>
+      <tr>
+        <td>視角</td>
+        <td>空拍、行車記錄儀、一般街拍</td>
+        <td>天花板半球型 CCTV、室內轉角監視器、門禁閘門上方、電梯大廳、戶外桿裝周界攝影機</td>
+      </tr>
+      <tr>
+        <td>場景</td>
+        <td>公園草地、農地、河岸、荒地</td>
+        <td>無塵室更衣區、無塵室走廊、辦公室走廊/開放空間、倉儲貨架走道、裝卸貨區、周界圍籬、員工停車場、門禁哨站、氣瓶儲存區</td>
+      </tr>
+      <tr>
+        <td>混淆物</td>
+        <td>土堆、石頭、稻草捆、購物車</td>
+        <td><b>無塵衣掛在更衣架上</b>（直立、人形輪廓）、<b>直立式氮氣/氬氣鋼瓶</b>、待料車上的晶圓 FOUP 盒、
+          閒置 AGV、安全假人、滅火器箱、堆疊塑膠椅、自動販賣機、開著門的伺服器機櫃、保全崗哨空椅⋯</td>
+      </tr>
+      <tr>
+        <td>光源條件</td>
+        <td>一般日照、夜間路燈</td>
+        <td>日光燈辦公室色溫、<b>無塵室微黃濾光照明（微影區常見，避免曝光光阻劑）</b>、夜間鈉燈周界照明、玻璃反光眩光</td>
+      </tr>
+    </table>
+    <div class="note">
+      最值得注意的兩個混淆物：<b>直立鋼瓶</b>（高度/輪廓很接近站立的人，是工業現場常見的誤判來源）和
+      <b>掛在架上的無塵衣</b>（尤其一整排背光掛著時，很像一排人站著）。這兩個是通用 COCO 模型在工廠情境
+      下最容易誤判的對象，原本的 prompts.yaml 完全沒有涵蓋到。
+    </div>
+    <div class="note warn">
+      這份清單是依常識推測的「可能混淆物」起點，<b>不是看過實際誤判紀錄歸納出來的</b>——
+      下一步最值得做的事，是把這份清單換成真正從現場誤判 log 裡挑出來的物件（README 裡也特別註明
+      <code>negatives.confusers</code> 最重要的填法就是「寫下你實際看過的誤判物件」）。
+    </div>
+
+    <h3>6.2　CCTV 真實感後處理：OSD 浮水印 / 暈影 / 魚眼廣角</h3>
+    <p>
+      真實的 CCTV/NVR 畫面幾乎都有三個生成模型很難穩定畫出來的特徵，所以改用<b>確定性的影像後處理</b>而不是
+      要求 Qwen-Image 畫出來（要求擴散模型畫出清晰、固定位置的小字時間戳記非常不可靠）：
+    </p>
+    <table>
+      <tr><th>效果</th><th>做法</th><th>安全性（對已標註的框）</th></tr>
+      <tr>
+        <td><code>osd_overlay</code> — 浮水印時間戳記</td>
+        <td>右下角畫出 <code>CAM-xx  YYYY-MM-DD HH:MM:SS</code>（黑底白字），模擬 NVR 疊字</td>
+        <td><span class="badge good">安全</span> 只覆蓋角落一小塊，不移動其他內容的座標</td>
+      </tr>
+      <tr>
+        <td><code>vignette</code> — 暈影</td>
+        <td>邊角亮度衰減，模擬廣角鏡頭的暗角</td>
+        <td><span class="badge good">安全</span> 純亮度調整，不移動像素位置</td>
+      </tr>
+      <tr>
+        <td><code>barrel_distort</code> — 魚眼/桶狀畸變</td>
+        <td>除法模型 <code>r_src = r_out / (1+k·r_out²)</code> 的最近鄰重新取樣，模擬半球型廣角鏡頭</td>
+        <td><span class="badge bad">僅限無框任務</span> 會搬動像素位置，若不同步校正標註框座標，
+          套用在 <code>style</code>/<code>remove</code>（有真實標註框）上會讓框位置跟物體對不上。
+          目前只在 <code>neg_t2i</code>（背景圖、無標註框）上啟用。</td>
+      </tr>
+    </table>
+    <figure>
+      <img src="_local_run/postproc_demo.png" alt="後處理效果展示">
+      <figcaption>由左至右：原圖 → 魚眼（k=0.3）→ 暈影 → OSD 時間戳記＋暈影＋魚眼疊加後的效果。
+        第一版魚眼實作有邊緣取樣超出範圍導致的條紋破圖，已修正為除法模型重新映射。</figcaption>
+    </figure>
+    <div class="note warn">
+      魚眼的畸變強度、OSD 文字格式/位置、暈影強弱都應該對照<b>實際那幾支攝影機的真實錄影</b>調整——
+      如果現場的半球攝影機畸變沒那麼強、或 NVR 根本沒有疊時間戳記，照搬這裡的預設值反而會讓合成資料
+      偏離真實分佈。這三個開關預設都是關閉（<code>p_fisheye</code>/<code>p_vignette</code>/<code>p_osd</code>
+      預設 0），不影響既有的 <code>pipeline.yaml</code>/<code>smoke.yaml</code> 設定。
+    </div>
+
+    <h3>6.3　新一批生成結果（半導體廠/辦公室情境）</h3>
+    <p>用新版 <code>prompts.yaml</code> 生成 16 張，流程走過一遍 <code>02 → 06 → 07 → 09</code>：</p>
+    <div class="stat-row">
+      <div class="stat"><div class="n">16</div><div class="l">生成張數</div></div>
+      <div class="stat"><div class="n" style="color:var(--good)">13</div><div class="l">通過過濾（81.2%）</div></div>
+      <div class="stat"><div class="n" style="color:var(--bad)">3</div><div class="l">被拒</div></div>
+    </div>
+    <figure>
+      <img src="_local_run/fab_contact_sheet.png" alt="半導體廠/辦公室情境生成結果">
+      <figcaption>13 張通過過濾、套用 CCTV 真實感後處理後的結果。主題明顯對上了：倉儲貨架走道、伺服器機櫃、
+        AGV 機器人、門禁閘門護欄、電梯大廳、休息室販賣機、氣瓶/管線區⋯右下角可見 <code>CAM-xx</code> 時間戳記浮水印。</figcaption>
+    </figure>
+    <div class="note bad">
+      <b>過程中抓到自己犯的 prompt 設計錯誤：</b>3 張被拒裡有 2 張（<code>neg_000002</code>、原本的
+      <code>neg_000005</code>）不是生成模型亂畫，而是我自己把<b>真正的目標類別</b>寫進了場景/混淆物裡
+      ——「a bicycle parking area」「a parked bicycle at a bike rack」本身就是在要求畫出一台腳踏車，
+      不是「長得像但不是」的混淆物。已經修正成「an empty metal bike rack with no bicycles」
+      （空腳踏車架，沒有車）和移除重複的 parking-lot 用詞。<b>這是寫 <code>confusers</code>/<code>scenes</code>
+      時最容易犯的錯：混淆物必須是「視覺上像、但類別上不是」，不能是目標類別本身換個場景再問一次。</b>
+      第三張（<code>neg_000003</code>）則是 sd-turbo 在弱 prompt 遵從度下，被 view 描述裡的關鍵字帶偏，
+      畫出了實際停車場/卡車——這點在正式用 Qwen-Image（有真正的 CFG）時預期會改善，但也再次印證
+      06/07 自動過濾無論如何都要做。
+    </div>
+  </section>
+
+  <section id="sota">
+    <h2><span class="num">7.</span>最先進方法調查（2024–2025）</h2>
+    <p>
+      另外調查了目前學界/業界在「用生成模型造資料改善偵測模型」這個方向上的最新做法，對照我們目前的
+      流程設計，找出哪些是已經做到位的、哪些是值得之後補強的。以下引用的論文/工具名稱、年份均可查證；
+      標示「<span class="badge warn">未證實</span>」的是尚未找到可查證來源、僅供參考的說法。
+    </p>
+
+    <h3>7.1　物件插入：比單純 inpainting 更進階的做法</h3>
+    <table>
+      <tr><th>方法</th><th>時間</th><th>重點</th><th>對我們的意義</th></tr>
+      <tr>
+        <td><b>AnyDoor</b></td><td>CVPR 2024</td>
+        <td>零樣本「物件傳送」：用參考物件的身份特徵 + 目標場景的細節特徵合成，不需要針對每個物件重新訓練。
+          在 VisDrone 上測試車輛插入，bus 類別在 10x 擴增下有明顯提升。</td>
+        <td>比我們現在 05 步驟用的 FLUX.1-Fill 遮罩插入<b>更適合規模化</b>，可評估換用。</td>
+      </tr>
+      <tr>
+        <td><b>ODGEN</b>（arXiv 2405.15199）</td><td>2024</td>
+        <td>針對領域資料微調擴散模型 + 每物件文字/視覺提示，YOLO 系偵測器 mAP@.50:.95 最高 <b>+25.3%</b>
+          ——目前找到最強的量化結果，但需要針對領域資料微調生成模型，成本不低。</td>
+        <td>如果 A5（插入）效果不夠，這是進一步加碼的方向，但先把現有流程跑過一輪再考慮值不值得。</td>
+      </tr>
+      <tr>
+        <td><b>SpotLight</b>（arXiv 2411.18665）/ <b>DiffusionHarmonizer</b>（arXiv 2602.24096）</td><td>2024–2026</td>
+        <td>專門解決「插入物件後陰影/光照對不上背景」的問題——這正是遮罩式 inpainting 插入最容易穿幫的地方。</td>
+        <td><span class="badge warn">值得之後評估</span> 如果 08 人工抽查發現插入物件的陰影對不上，這是對應的解法方向。</td>
+      </tr>
+    </table>
+
+    <h3>7.2　生成資料的品質過濾：不只是單一 teacher 偵測器</h3>
+    <table>
+      <tr><th>方法</th><th>時間</th><th>重點</th><th>對我們的意義</th></tr>
+      <tr>
+        <td><b>Sieve</b></td><td>CVPR 2024</td>
+        <td>純 CLIP-score 過濾雜訊偏多（CLIP 本身訓練時就有雜訊），用合成字幕一致性過濾比 CLIPScore 準 1.7–2.6%。</td>
+        <td>印證我們目前「teacher 偵測 + 結構相似度」的做法<b>比單純 CLIP 過濾更紮實</b>，不需要改用 CLIP。</td>
+      </tr>
+      <tr>
+        <td>多模型一致性過濾（ensemble agreement）</td><td>通用做法，未見 2025 年針對生成偵測資料的專文</td>
+        <td>自我訓練（self-training）文獻中常見：多個教師模型意見一致才採信。</td>
+        <td><span class="badge warn">可選的泛用升級</span> 目前單一 RF-DETR teacher 是合理選擇，但加一個架構不同的
+          第二教師（例如 YOLO）、只保留兩者都同意的樣本，是有文獻依據、但非必要的加強。</td>
+      </tr>
+      <tr>
+        <td>VLM/CLIP 式品質過濾 × 偵測資料</td><td>—</td>
+        <td>調查<b>沒有找到</b>把「teacher 偵測信心 + VLM 語意過濾」結合用在生成式偵測訓練資料上的論文。</td>
+        <td>這是文獻上的<b>空白</b>，不是我們漏做了什麼已知做法。</td>
+      </tr>
+    </table>
+
+    <h3>7.3　監控/CCTV 領域專屬的合成資料研究</h3>
+    <ul class="compact">
+      <li><b>RGB→熱像/紅外合成</b>（SPIE 2024、IEEE T-ASE 2025）：確認「夜視紅外合成」是跟我們現在做的
+        「RGB 風格轉換模擬夜視」<b>不同的獨立研究路線</b>，用 GAN/擴散直接生成熱像而非在可見光上套濾鏡，
+        夜間偵測效果更好，但需要熱像教師模型/資料，成本高很多。</li>
+      <li><b>魚眼/半球攝影機專屬的合成資料研究</b>：<span class="badge warn">偏薄弱</span>，沒找到 2025 年的
+        直接後繼研究，只有舊的 MOTSynth/DummyNet 這類行人監控合成資料基準。</li>
+      <li><b>H.264/H.265 壓縮痕跡模擬</b>（相對於我們目前用的 JPEG 壓縮）：<span class="badge warn">沒找到專文</span>，
+        目前看起來是個開放的小缺口，JPEG 近似應該夠用但不是最精確的。</li>
+    </ul>
+
+    <h3>7.4　編輯模型版圖（2025 下半年）</h3>
+    <p>
+      <b>FLUX.1 Kontext</b>（Black Forest Labs，arXiv 2506.15742，2025年5月）是 Qwen-Image-Edit 之外另一個
+      主流選項，官方自建的 KontextBench 聲稱在局部編輯/角色保持上領先。但<b>沒有找到獨立、可查證的
+      Qwen-Image-Edit vs FLUX.1 Kontext 正面對比</b>——目前選用 Qwen-Image-Edit-2509 是合理選擇，
+      但文獻上還無法證明它比 FLUX.1 Kontext 更適合我們的用途，值得之後實測比較（尤其是物件移除的乾淨度）。
+      <span class="badge warn">未證實</span>：網路上有 blog 引用 Qwen-Image-Edit 在 GEdit-Bench 分數與 GPT-Image-1
+      相近，但評分用的 judge 模型不同、不能直接比較，Qwen-Image-Edit-2511 也還沒有公開的基準數據。
+    </p>
+
+    <h3>7.5　實驗驗證的嚴謹度</h3>
+    <ul class="compact">
+      <li>業界案例確認：<b>合成資料的效果不是單調的</b>——某車輛偵測案例顯示，真實資料只有 5% 時加合成資料讓 recall
+        翻倍以上，但真實資料已經 100% 時再加合成資料反而讓 recall 下降（模型變保守）。
+        這<b>直接印證我們 A0–A5 分組對照實驗的設計是對的</b>——效果因資料組合而異，不能只看一個全域的「有效/無效」結論。</li>
+      <li>另一篇 2026 的煙霧偵測論文指出<b>合成驗證集看起來會「異常地簡單/可靠」</b>，必須用真實保留資料驗證——
+        這正是我們要求 <code>deploy_eval</code>/<code>deploy_bg</code> 必須是真實畫面、不能用合成資料代替的理由。</li>
+      <li>沒有找到比我們目前用的「paired bootstrap 信賴區間」更嚴謹的統計做法——我們目前的驗證嚴謹度<b>不落後</b>於一般常見做法。</li>
+    </ul>
+
+    <h3>7.6　半導體廠/無塵室/倉儲專屬的監控合成資料</h3>
+    <div class="note bad">
+      調查確認：<b>幾乎沒有專門針對半導體廠/無塵室/辦公室 CCTV 情境的公開研究</b>（只有晶圓圖、TEM 影像生成這類
+      「半導體量測」的生成研究，跟「監控畫面」是完全不同的題目；另有車站/機場全向攝影機行人偵測的合成資料研究，
+      場景也不是廠房）。換句話說，<b>第 6 節的無塵衣/鋼瓶混淆物清單是原創的領域調整，不是在重現某篇已發表的做法</b>
+      ——沒有現成的論文可以照抄，這部分只能靠對照真實誤判案例持續調整。
+    </div>
+  </section>
+
+  <section id="findings">
+    <h2><span class="num">8.</span>關鍵發現</h2>
+    <table>
+      <tr><th>發現</th><th>內容</th><th>影響</th></tr>
+      <tr>
+        <td>gcsfuse + mmap 推論極慢</td>
+        <td>模型權重放在 gcsfuse 上直接讀取，推論前的載入可能要近 50 分鐘；先搬到本機磁碟可縮短到秒級。</td>
+        <td><span class="badge warn">環境注意事項</span> 之後在任何 gcsfuse/網路掛載環境部署都要套用同樣做法</td>
+      </tr>
+      <tr>
+        <td>negative_prompt 在 guidance_scale=0 下完全失效</td>
+        <td>sd-turbo 建議用 CFG-free（<code>guidance_scale=0</code>）推論，但 negative_prompt 是透過
+          classifier-free guidance 生效的，guidance_scale=0 時等於沒有負面提示詞在作用，
+          這很可能是車輛洩漏的主因之一。正式用 Qwen-Image（<code>true_cfg_scale=4.0</code>）時
+          negative_prompt 會真正生效，洩漏率預期會更低。</td>
+        <td><span class="badge good">不影響正式方案</span> 但更凸顯 06/07 自動過濾<b>不能省略</b>，不能只靠 prompt 工程</td>
+      </tr>
+      <tr>
+        <td>自動過濾機制確實有在抓東西</td>
+        <td>20 張裡 3 張（15%）被 teacher 偵測揪出含有目標類別，全部正確剔除，没有漏网。</td>
+        <td><span class="badge good">驗證通過</span> 06→07 的把關邏輯在真實情境下有效</td>
+      </tr>
+      <tr>
+        <td>CPU 推論速度量級</td>
+        <td>生成（sd-turbo, 512², 2 步）：~100秒/張。偵測（YOLOv8n, 640）：~0.9秒/張。劣化（純影像運算）：~0.07秒/張。</td>
+        <td><span class="badge warn">僅供參考</span> 正式的 Qwen-Image / Qwen-Image-Edit-2509 在 GPU 上才有實用速度（README 估計 A100 上 5–60 秒/張），CPU 完全不適合正式產量</td>
+      </tr>
+      <tr>
+        <td>混淆物清單自己也會寫錯</td>
+        <td>半導體廠批次裡，3 張被拒中有 2 張是因為 <code>scenes</code>/<code>confusers</code> 裡不小心直接寫了
+          目標類別本身（腳踏車停車場、停放的腳踏車），而不是「像但不是」的混淆物。</td>
+        <td><span class="badge warn">流程提醒</span> 之後補真實誤判物件到 <code>confusers</code> 時，要檢查寫的是不是
+          不小心變成目標類別的另一種描述</td>
+      </tr>
+    </table>
+  </section>
+
+  <section id="next">
+    <h2><span class="num">9.</span>尚未完成 / 下一步</h2>
+    <p>這次只驗證了 <b>02 → 06 → 07 → 09</b> 這條支線，而且生成端是用品質較弱的 sd-turbo 代打。距離真正能做出
+      可行性結論，還缺：</p>
+    <ul class="compact">
+      <li><b>最重要、目前完全沒有的東西：</b> <code>deploy_eval</code>（200–500 張已標註真實部署畫面）與
+        <code>deploy_bg</code>（200+ 張確認無目標物的真實畫面）。沒有這兩組真實資料，任何實驗組的分數都無法驗證——
+        合成資料不能拿來評估合成資料。</li>
+      <li>Step 03（Qwen-Image-Edit 去除人物）、04（風格轉換）完全沒測試過——sd-turbo 是純文字生成模型，沒有編輯能力，
+        這兩步在本機無法用 sd-turbo 代打，必須等正式的 Qwen-Image-Edit-2509。</li>
+      <li>正式生成品質：需要在有 GPU、有網路的機器上跑 <code>offline/prepare_bundle.sh</code>，
+        下載 Qwen-Image、Qwen-Image-Edit-2509、Lightning LoRA、RF-DETR-Large 等權重，打包後搬進隔離 GPU 環境。</li>
+      <li>完整 A0–A5 對照實驗（13 訓練 → 14 預測 → 15 評估 → 16 比較），套用
+        <code>pipeline.yaml</code> 裡定義的通過標準：背景誤判率下降 ≥30%、真實召回率下降 ≤2 個百分點、
+        COCO mAP 下降 ≤1 個百分點。</li>
+      <li><b>用真實誤判紀錄取代用猜的混淆物清單</b>（第 6.1 節）——目前的無塵衣/鋼瓶/AGV 清單是依常識推測的起點，
+        去把現場 NVR 真的誤判過的畫面挑出來，才是真正該填進 <code>confusers</code> 的內容。</li>
+      <li>對照實際攝影機校正 CCTV 真實感參數（第 6.2 節）——魚眼畸變強度、OSD 時間戳記格式/位置、暈影強弱，
+        都應該參考現場那幾支攝影機的真實錄影調整，不要照搬本報告的預設值。</li>
+      <li>小規模比較 <b>Qwen-Image-Edit-2509 vs. FLUX.1 Kontext</b> 在物件移除/風格轉換上的乾淨度
+        （第 7.4 節：文獻上沒有可查證的正面對比，需要自己實測才能知道哪個更適合）。</li>
+    </ul>
+    <div class="note warn">
+      本機這輪驗證的意義是「<b>確認程式碼與資料流本身沒問題</b>」，不是「<b>確認這個方法對產品有效</b>」——
+      後者要等真的用 Qwen-Image/Qwen-Image-Edit 生成、而且有真實標註資料可以評估之後才能下結論。
+    </div>
+  </section>
+
+  <footer>syngen_od 可行性研究 ｜ 本報告與所附圖片存放於 <code>syngen_od/_local_run/</code></footer>
+
+</div>
+</body>
+</html>

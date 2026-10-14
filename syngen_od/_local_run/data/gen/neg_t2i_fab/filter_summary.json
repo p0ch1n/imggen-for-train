@@ -1,0 +1,76 @@
+{
+  "task": "neg_t2i",
+  "checked": 16,
+  "kept": 13,
+  "pass_rate": 0.8125,
+  "reject_reasons": {
+    "target_detected": 3
+  },
+  "pass_rate_by_confuser": {
+    "a cleanroom bunny suit hanging upright on a gowning rack": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "a concrete pillar casting a long shadow under fluorescent light": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "a hi-vis safety vest and hard hat hanging on a wall hook": {
+      "kept": 2,
+      "total": 2,
+      "rate": 1.0
+    },
+    "a large dumpster and recycling bins": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "a mop and bucket left standing in a corridor": {
+      "kept": 0,
+      "total": 1,
+      "rate": 0.0
+    },
+    "a parked bicycle at a bike rack": {
+      "kept": 0,
+      "total": 1,
+      "rate": 0.0
+    },
+    "a row of cleanroom suits hanging on a rack, backlit": {
+      "kept": 1,
+      "total": 2,
+      "rate": 0.5
+    },
+    "a security guard's empty chair and podium at a checkpoint": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "a stack of wafer FOUP boxes on a transport cart": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "a tall vending machine": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "an idle AGV (automated guided vehicle) robot parked in the corridor": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "an upright industrial gas cylinder (nitrogen or argon tank)": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "traffic cones and safety barrels near a vehicle gate": {
+      "kept": 2,
+      "total": 2,
+      "rate": 1.0
+    }
+  }
+}

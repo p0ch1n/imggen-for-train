@@ -1,0 +1,21 @@
+# Downloadable model weights and HF cache -- not source, re-downloadable, and several files inside
+# exceed GitHub's hard 100MB per-file limit (e.g. models/sd-turbo/unet/*.safetensors is 1.7GB).
+/models/
+/hf_cache/
+
+# Public COCO dataset annotations -- re-downloadable from cocodataset.org, not project code.
+# instances_train2017.json alone is 449MB (over GitHub's 100MB hard file-size limit).
+/syngen_local/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS cruft
+.DS_Store
+
+# Claude Code's own local session/scheduling state, not project source
+/.claude/

@@ -1,0 +1,21 @@
+# Core (pipeline steps 01, 07-12, 15-16 only need these)
+numpy>=1.24
+pillow>=10.0
+pyyaml>=6.0
+
+# Generation (02-05): diffusers needs a version with the QwenImage / QwenImageEditPlus pipelines
+torch>=2.4
+diffusers>=0.36.0
+transformers>=4.51
+accelerate>=1.0
+safetensors
+sentencepiece
+peft>=0.17          # Lightning LoRA
+
+# Teacher / training / eval
+ultralytics>=8.3.100   # YOLOv12 support
+rfdetr>=1.3
+
+# Tests
+pytest
+pycocotools

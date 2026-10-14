@@ -1,0 +1,215 @@
+# =====================================================================================
+#  syngen_od pipeline config (meant for the isolated GPU environment)
+#  Paths support ${a.b} references and ${env:VAR}. Relative paths are resolved from the
+#  project root (the syngen_od directory).
+# =====================================================================================
+root: /data/syngen_od                 # working root in the isolated env (data/models/outputs all go here)
+
+# Class list: must match the production model's class names and ORDER exactly.
+# If production is the 80-class COCO model, list all 80 classes here, otherwise fine-tuning re-initialises the head.
+classes: [person, bicycle, car, motorcycle, bus, truck]
+seed: 0
+
+paths:
+  models: ${root}/models
+  coco_train_images: ${root}/coco/train2017
+  coco_train_ann: ${root}/coco/annotations/instances_train2017.json
+  coco_val_images: ${root}/coco/val2017
+  coco_val_ann: ${root}/coco/annotations/instances_val2017.json
+  coco_subset: ${root}/data/coco_subset          # produced by 01: images/{train,val} labels/{train,val}
+  gen: ${root}/data/gen                          # produced by 02-05
+  deploy_eval: ${root}/data/deploy_eval/images   # real deployment frames, labelled (images/ + labels/)  <- prepared manually
+  deploy_bg: ${root}/data/deploy_bg/images       # real deployment frames confirmed to contain no targets  <- prepared manually
+  deploy_unlabeled: ${root}/data/deploy_unlabeled/images  # unlabelled deployment frames (for A4 / insert backgrounds)
+  pseudo: ${root}/data/pseudo                    # produced by 10
+  experiments: ${root}/experiments               # produced by 12
+  runs: ${root}/runs                             # training outputs
+  results: ${root}/results                       # evaluation outputs
+
+# ------------------------------------------------------------------ 01 COCO subset
+coco_subset:
+  train_max_images: 20000        # images containing a target class (sampled randomly)
+  val_max_images: 2000
+  background_frac: 0.05          # also keep COCO images with no target class (as a fraction of the above)
+  min_box_px: 2                  # drop boxes narrower/shorter than this
+  link_mode: symlink             # symlink | copy
+
+# ------------------------------------------------------------------ generation models
+generation:
+  t2i:                           # Qwen-Image text-to-image
+    backend: diffusers           # diffusers | mock
+    model_path: ${paths.models}/Qwen-Image
+    dtype: bfloat16
+    steps: 50
+    true_cfg_scale: 4.0
+    offload: none                # none | model (≈24-32GB VRAM) | sequential (slowest, lowest VRAM)
+    device: cuda
+    # Lightning LoRA (8 steps, roughly 6x faster): uncomment the lines below and set steps: 8, true_cfg_scale: 1.0
+    # lora_path: ${paths.models}/Qwen-Image-Lightning
+    # lora_weight_name: Qwen-Image-Lightning-8steps-V1.1.safetensors
+    # lightning_scheduler: true
+  edit:                          # Qwen-Image-Edit / -2509 / -2511 (pipeline class read from model_index.json)
+    backend: diffusers
+    model_path: ${paths.models}/Qwen-Image-Edit-2509
+    dtype: bfloat16
+    steps: 40
+    true_cfg_scale: 4.0
+    offload: none
+    device: cuda
+  inpaint:                       # only used by 05 (insert, optional)
+    backend: diffusers
+    model_path: ${paths.models}/FLUX.1-Fill-dev
+    dtype: bfloat16
+    steps: 40
+    guidance_scale: 30
+    offload: none
+    device: cuda
+
+prompts_file: configs/prompts.yaml
+
+# ------------------------------------------------------------------ generation tasks
+tasks:
+  neg_t2i:                       # 02: hard negatives from text (scenes with "look-alike" objects, no targets)
+    out: ${paths.gen}/neg_t2i
+    num_images: 2000
+    sizes: [[1664, 928], [1472, 1104], [1328, 1328]]   # Qwen-Image's recommended sizes (16:9, 4:3, 1:1)
+    filter:
+      phantom_conf: 0.25         # reject the image if the teacher sees ANY target class at conf >= this
+
+  remove:                        # 03: Qwen-Image-Edit removes people from COCO images -> paired negatives
+    out: ${paths.gen}/remove
+    num_images: 1000
+    remove_classes: [person]
+    max_instances: 3             # crowds are hard to remove cleanly; only take images with <=3 people
+    min_area_frac: 0.005
+    max_area_frac: 0.35
+    min_short_side: 320
+    filter:
+      phantom_conf: 0.25         # removed class must be undetectable
+      global_struct_min: 0.45    # whole-image structure similarity to source (low = the edit redrew the scene)
+      box_struct_min: 0.45       # structure similarity of each kept (non-removed) box
+      keep_teacher_conf: 0.1     # a kept box also passes if the teacher still finds it (IoU>=0.5) at this conf
+      min_box_px: 16             # boxes smaller than this can't be verified and are skipped
+
+  style:                         # 04: label-preserving style transfer (night/rain/fog/CCTV...), boxes copied
+    out: ${paths.gen}/style
+    num_images: 2000
+    min_short_side: 320
+    filter:
+      global_struct_min: 0.40
+      box_struct_min: 0.40
+      keep_teacher_conf: 0.1
+      min_box_px: 16
+      max_lost_frac: 0.0         # max fraction of verifiable boxes allowed to fail before rejecting the image
+      phantom_conf: 0.6          # an unlabelled high-conf detection usually means a hallucinated object
+
+  insert:                        # 05 (optional): inpaint objects into deployment backgrounds
+    out: ${paths.gen}/insert
+    backgrounds: ${paths.pseudo}/kept.txt     # images with trusted labels (pseudo-labelled or deploy_bg)
+    num_images: 1000
+    objects_per_image: [1, 3]
+    object_height_px:            # target object height in the original frame (small objects = mostly the misses)
+      person: [24, 160]
+      car: [16, 120]
+    aspect_hw:                   # height/width ratio
+      person: [1.8, 3.2]
+      car: [0.45, 0.8]
+    context_scale: 3.0           # inpaint crop size = this x object size (at least min_crop px)
+    min_crop: 384
+    inpaint_size: 1024
+    filter:
+      match_conf: 0.35           # inserted object must be found by the teacher inside the mask
+      match_iou: 0.3
+
+# ------------------------------------------------------------------ teacher (filtering + pseudo labels)
+teacher:
+  backend: rfdetr                # rfdetr | ultralytics | grounding_dino | mock
+  variant: RFDETRLarge
+  weights: ${paths.models}/rf-detr-large.pth
+  conf: 0.05                     # keep low; each step applies its own threshold
+  # backend: grounding_dino
+  # model_path: ${paths.models}/grounding-dino-base
+  # prompts: {person: person, car: car, ...}
+  # device: cuda
+
+# ------------------------------------------------------------------ 09 camera-like degradation
+degrade:
+  p_rescale: 0.7
+  rescale: [0.4, 1.0]
+  p_blur: 0.3
+  blur_radius: [0.3, 1.2]
+  p_noise: 0.5
+  noise_sigma: [2, 8]
+  p_jpeg: 0.8
+  jpeg_quality: [35, 90]
+
+# ------------------------------------------------------------------ 10 pseudo labels (A4)
+pseudo_label:
+  conf_high: 0.5                 # >= this becomes a label
+  conf_low: 0.2                  # dets in [conf_low, conf_high) are ambiguous
+  drop_ambiguous: true           # drop images with ambiguous dets (YOLO has no ignore regions)
+  max_empty_frac: 0.2            # images with no dets at all are capped at this fraction of the output
+  max_images: 3000
+
+# ------------------------------------------------------------------ 12 experiment arms
+experiments:
+  base_train: ${paths.coco_subset}/images/train
+  val: ${paths.coco_subset}/images/val
+  arms:                          # each arm = base_train + these sources (max = cap on images sampled)
+    A0: []                       # control: COCO only, same recipe (rules out "longer training alone helps")
+    A1:
+      - {list: "${tasks.neg_t2i.out}/kept.txt", max: 1000}
+      - {list: "${tasks.remove.out}/kept.txt", max: 1000}
+    A2:
+      - {list: "${tasks.style.out}/kept.txt", max: 2000}
+    A3:
+      - {list: "${tasks.neg_t2i.out}/kept.txt", max: 1000}
+      - {list: "${tasks.remove.out}/kept.txt", max: 1000}
+      - {list: "${tasks.style.out}/kept.txt", max: 2000}
+    A4:
+      - {list: "${paths.pseudo}/kept.txt", max: 3000}
+    # A5:
+    #   - {list: "${tasks.insert.out}/kept.txt", max: 1000}
+
+# ------------------------------------------------------------------ 13 training
+train:
+  weights: ${paths.models}/prod_yolov12s.pt     # current production weights (fine-tune starting point)
+  arms: [A0, A1, A2, A3, A4]
+  args:                          # passed straight to ultralytics model.train()
+    epochs: 40
+    imgsz: 640
+    batch: 32
+    optimizer: SGD               # set explicitly; with 'auto', Ultralytics ignores lr0
+    lr0: 0.002
+    lrf: 0.1
+    warmup_epochs: 1
+    close_mosaic: 5
+    seed: 0
+    deterministic: true
+    workers: 8
+    device: 0
+    patience: 0
+
+# ------------------------------------------------------------------ 14-16 evaluation
+eval:
+  conf_thr: 0.25                 # the production operating threshold
+  iou_thr: 0.5
+  predict:                       # predictor settings (backend/weights filled in per model by 14)
+    backend: ultralytics
+    conf: 0.001
+    iou: 0.7
+    imgsz: 640
+    batch: 16
+  sets:
+    deploy_eval: ${paths.deploy_eval}
+    deploy_bg: ${paths.deploy_bg}
+    coco_val: ${paths.coco_subset}/images/val
+  models:                        # model name -> weights; arms are added automatically from runs/
+    prod: ${train.weights}
+  reference: A0                  # deltas & pass/fail computed against this model
+  bootstrap: 1000
+
+criteria:                        # feasibility "pass" thresholds (relative to reference)
+  bg_fp_reduction_min: 0.30      # deploy_bg FP/image must drop by >= 30%
+  recall_drop_max: 0.02          # deploy_eval recall@conf_thr may drop by at most 2 points
+  coco_map_drop_max: 0.01        # coco_val mAP50-95 may drop by at most 1 point

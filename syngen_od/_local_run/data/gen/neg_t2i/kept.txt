@@ -1,0 +1,17 @@
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000000.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000001.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000004.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000005.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000006.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000007.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000008.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000009.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000010.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000011.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000012.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000013.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000014.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000015.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000016.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000018.jpg
+/home/kasm-user/_syngen_local_run/data/gen/neg_t2i/images/neg_000019.jpg

@@ -1,0 +1,27 @@
+# Smoke test: every model replaced with a mock, tiny fake data, 1 training epoch on CPU.
+# Usage: bash tools/run_smoke.sh <workdir>
+extends: pipeline.yaml
+root: ${env:SMOKE_ROOT}
+coco_subset: {train_max_images: 200, val_max_images: 50}
+generation:
+  t2i: {backend: mock}
+  edit: {backend: mock}
+  inpaint: {backend: mock}
+tasks:
+  neg_t2i: {num_images: 24, sizes: [[320, 240], [256, 256]]}
+  remove: {num_images: 12, min_short_side: 200}
+  style: {num_images: 24, min_short_side: 200}
+  insert: {num_images: 12, object_height_px: {person: [24, 80], car: [16, 50]}, min_crop: 128, inpaint_size: 256}
+teacher: {backend: mock, phantom_prob: 0.1}
+pseudo_label: {max_images: 50}
+experiments:
+  arms:
+    A5:
+      - {list: "${tasks.insert.out}/kept.txt", max: 1000}
+train:
+  weights: yolo12n.pt
+  arms: [A0, A1, A2, A3, A4, A5]
+  args: {epochs: 1, imgsz: 160, batch: 8, device: cpu, workers: 0, plots: false, amp: false}
+eval:
+  predict: {imgsz: 160, device: cpu}
+  bootstrap: 200

@@ -1,0 +1,71 @@
+{
+  "task": "neg_t2i",
+  "checked": 20,
+  "kept": 17,
+  "pass_rate": 0.85,
+  "reject_reasons": {
+    "target_detected": 3
+  },
+  "pass_rate_by_confuser": {
+    "a fire hydrant and a mailbox": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "a large dumpster and storage boxes": {
+      "kept": 2,
+      "total": 3,
+      "rate": 0.667
+    },
+    "a parked shopping cart": {
+      "kept": 1,
+      "total": 2,
+      "rate": 0.5
+    },
+    "a shadow of a tree on the ground": {
+      "kept": 1,
+      "total": 2,
+      "rate": 0.5
+    },
+    "black garbage bags piled up": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "covered tarps over equipment": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "dense round bushes": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "hay bales": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "large rocks and boulders": {
+      "kept": 1,
+      "total": 1,
+      "rate": 1.0
+    },
+    "traffic cones and safety barrels": {
+      "kept": 3,
+      "total": 3,
+      "rate": 1.0
+    },
+    "tree stumps of various heights": {
+      "kept": 2,
+      "total": 2,
+      "rate": 1.0
+    },
+    "wooden fence posts": {
+      "kept": 2,
+      "total": 2,
+      "rate": 1.0
+    }
+  }
+}
